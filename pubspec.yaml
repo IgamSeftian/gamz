@@ -8,10 +8,17 @@ environment:
 
 dependencies:
   crypto: ^3.0.7
+  file_picker: ^11.0.3
+  fl_chart: ^0.70.2
   flutter:
     sdk: flutter
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+  image_picker: ^1.2.0
+  intl: ^0.20.2
+  path_provider: ^2.1.5
+  pdf: ^3.11.3
+  printing: ^5.14.3
 
 dev_dependencies:
   flutter_test:

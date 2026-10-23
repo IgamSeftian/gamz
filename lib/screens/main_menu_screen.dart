@@ -7,10 +7,14 @@ import '../services/item_service.dart';
 import '../services/penjualan_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/currency.dart';
+import '../widgets/chart_penjualan.dart';
+import '../widgets/chart_pie.dart';
 import 'login_screen.dart';
 import 'master_customer_screen.dart';
 import 'master_item_screen.dart';
 import 'master_penjualan_screen.dart';
+import 'profile_screen.dart';
+import 'report_screen.dart';
 
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
@@ -25,6 +29,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   /// True = detail ditampilkan, False = detail disembunyikan.
   bool _showDetail = false;
+
+  /// Mode agregasi chart (By Customer / By Item), dipakai bersama.
+  ChartMode _chartMode = ChartMode.customer;
+
+  /// Mode nilai chart (Rupiah/Qty).
+  ChartValueMode _chartValueMode = ChartValueMode.gross;
 
   @override
   void initState() {
@@ -101,7 +111,20 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       drawer: _buildDrawer(context),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 24),
-        child: _buildHeader(years, grandTotal, totalQty),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            _buildHeader(years, grandTotal, totalQty),
+            ChartPenjualanWidget(
+              tahun: _selectedYear,
+              mode: _chartMode,
+              onModeChanged: (mode) => setState(() => _chartMode = mode),
+              valueMode: _chartValueMode,
+              onValueChanged: (mode) => setState(() => _chartValueMode = mode),
+            ),
+            ChartPieWidget(tahun: _selectedYear, mode: _chartMode, valueMode: _chartValueMode),
+          ],
+        ),
       ),
     );
   }
@@ -173,9 +196,20 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.insert_chart_outlined),
+            title: const Text(' Laporan '),
+            onTap: () {
+              Navigator.pop(context);
+              _openMaster(const ReportScreen());
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.person),
             title: const Text(' My Profile '),
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              Navigator.pop(context);
+              _openMaster(const ProfileScreen());
+            },
           ),
           const Divider(),
           ListTile(
@@ -274,7 +308,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 gridDelegate:
                     const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 360,
-                  mainAxisExtent: 196,
+                  mainAxisExtent: 220,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
                 ),
@@ -442,14 +476,14 @@ class _PenjualanCard extends StatelessWidget {
 
   final Penjualan penjualan;
 
-  String get _namaItem {
-    final item = ItemService.byNo(penjualan.noItm);
-    return item?.nama ?? penjualan.noItm;
-  }
-
   String get _namaCustomer {
     final customer = CustomerService.byNo(penjualan.noCust);
     return customer?.nama ?? penjualan.noCust;
+  }
+
+  String _namaItem(String noItm) {
+    final item = ItemService.byNo(noItm);
+    return item?.nama ?? noItm;
   }
 
   @override
@@ -482,7 +516,7 @@ class _PenjualanCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        _namaItem,
+                        penjualan.noInv,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -493,7 +527,7 @@ class _PenjualanCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${penjualan.noInv} • $_namaCustomer',
+                        '$_namaCustomer • ${penjualan.items.length} item',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -506,14 +540,50 @@ class _PenjualanCard extends StatelessWidget {
                 ),
               ],
             ),
-            const Spacer(),
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: <Widget>[
+                    for (final line in penjualan.items)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                '${_namaItem(line.noItm)} x${line.qty}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              formatRupiah(line.gross),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             const Divider(height: 1),
             const SizedBox(height: 12),
             Row(
               children: <Widget>[
                 _Field(label: 'Qty', value: '${penjualan.qty}'),
-                _divider(),
-                _Field(label: 'Harga', value: formatRupiah(penjualan.harga)),
                 _divider(),
                 _Field(
                   label: 'Gross',

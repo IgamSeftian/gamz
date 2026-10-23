@@ -64,7 +64,15 @@ class PenjualanService {
   }
 
   static Future<void> save(Penjualan penjualan) async {
-    await _box.put(penjualan.noInv, penjualan.toMap());
+    final now = DateTime.now();
+    final saved = Penjualan(
+      noInv: penjualan.noInv,
+      tahun: penjualan.tahun,
+      noCust: penjualan.noCust,
+      items: penjualan.items,
+      addTime: penjualan.addTime ?? now,
+    );
+    await _box.put(saved.noInv, saved.toMap());
   }
 
   static Future<void> delete(String noInv) async {

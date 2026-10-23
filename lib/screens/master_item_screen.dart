@@ -16,7 +16,7 @@ class MasterItemScreen extends StatefulWidget {
 }
 
 class _MasterItemScreenState extends State<MasterItemScreen> {
-  late List<Item> _items = ItemService.all();
+  List<Item> _items = ItemService.all();
 
   void _reload() => setState(() => _items = ItemService.all());
 
@@ -30,21 +30,24 @@ class _MasterItemScreenState extends State<MasterItemScreen> {
   Future<void> _delete(Item item) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Item'),
-        content: const Text('Apakah anda yakin akan menghapus data ini?'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Hapus Item'),
+            content: const Text('Apakah anda yakin akan menghapus data ini?'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Hapus'),
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
     );
     if (confirm != true) return;
     await ItemService.delete(item.noItm);
@@ -62,29 +65,31 @@ class _MasterItemScreenState extends State<MasterItemScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Tambah'),
       ),
-      body: _items.isEmpty
-          ? const EmptyList(
-              message: 'Belum ada item.\nTekan "Tambah" untuk membuat.',
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-              itemCount: _items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final item = _items[index];
-                return MasterListCard(
-                  badge: item.noItm,
-                  title: item.nama,
-                  lines: <String>[
-                    if (item.singkatan.isNotEmpty)
-                      'Singkatan: ${item.singkatan}',
-                    'Harga: ${formatRupiah(item.harga)}',
-                  ],
-                  onEdit: () => _openForm(item: item),
-                  onDelete: () => _delete(item),
-                );
-              },
-            ),
+      body:
+          _items.isEmpty
+              ? const EmptyList(
+                message: 'Belum ada item.\nTekan "Tambah" untuk membuat.',
+              )
+              : ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                itemCount: _items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final item = _items[index];
+                  return MasterListCard(
+                    badge: item.noItm,
+                    title: item.nama,
+                    lines: <String>[
+                      if (item.singkatan.isNotEmpty)
+                        'Singkatan: ${item.singkatan}',
+                      'Harga: ${formatRupiah(item.harga)}',
+                      'HPP: ${formatRupiah(item.hpp)}',
+                    ],
+                    onEdit: () => _openForm(item: item),
+                    onDelete: () => _delete(item),
+                  );
+                },
+              ),
     );
   }
 }
@@ -104,6 +109,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   late final TextEditingController _nama;
   late final TextEditingController _singkatan;
   late final TextEditingController _harga;
+  late final TextEditingController _hpp;
   late final String _noItm;
 
   bool get _isEdit => widget.item != null;
@@ -118,6 +124,10 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     _harga = TextEditingController(
       text: item == null ? '' : formatThousands(item.harga),
     );
+    _hpp = TextEditingController(
+      text:
+          item == null ? '' : (item.hpp <= 0 ? '' : formatThousands(item.hpp)),
+    );
   }
 
   @override
@@ -125,6 +135,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     _nama.dispose();
     _singkatan.dispose();
     _harga.dispose();
+    _hpp.dispose();
     super.dispose();
   }
 
@@ -136,6 +147,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       nama: _nama.text.trim(),
       singkatan: _singkatan.text.trim(),
       harga: (parseThousands(_harga.text) ?? 0).toDouble(),
+      hpp: (parseThousands(_hpp.text) ?? 0).toDouble(),
     );
     await ItemService.save(item);
     if (!mounted) return;
@@ -197,7 +209,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                   inputFormatters: const <TextInputFormatter>[
                     ThousandsInputFormatter(),
                   ],
-                  textInputAction: TextInputAction.done,
+                  textInputAction: TextInputAction.next,
                   validator: (value) {
                     final parsed = parseThousands(value ?? '');
                     if (parsed == null || parsed <= 0) {
@@ -207,11 +219,22 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 28),
-              FilledButton(
-                onPressed: _save,
-                child: const Text('Simpan'),
+              const SizedBox(height: 16),
+              LabeledField(
+                label: 'HPP (Harga Beli)',
+                child: MasterTextField(
+                  controller: _hpp,
+                  hint: '0',
+                  icon: Icons.shopping_bag_outlined,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const <TextInputFormatter>[
+                    ThousandsInputFormatter(),
+                  ],
+                  textInputAction: TextInputAction.done,
+                ),
               ),
+              const SizedBox(height: 28),
+              FilledButton(onPressed: _save, child: const Text('Simpan')),
             ],
           ),
         ),

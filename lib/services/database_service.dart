@@ -19,6 +19,7 @@ class DatabaseService {
   static const String itemsBoxName = 'items';
   static const String customersBoxName = 'customers';
   static const String penjualanBoxName = 'penjualan';
+  static const String tokoProfileBoxName = 'toko_profile';
 
   /// Dipanggil sekali saat aplikasi start.
   static Future<void> init() async {
@@ -28,6 +29,7 @@ class DatabaseService {
     await Hive.openBox(itemsBoxName);
     await Hive.openBox(customersBoxName);
     await Hive.openBox(penjualanBoxName);
+    await Hive.openBox(tokoProfileBoxName);
   }
 
   /// Box berisi seluruh akun user.
@@ -44,4 +46,7 @@ class DatabaseService {
 
   /// Box berisi transaksi penjualan (master penjualan).
   static Box get penjualan => Hive.box(penjualanBoxName);
+
+  /// Box berisi profil toko.
+  static Box get tokoProfile => Hive.box(tokoProfileBoxName);
 }

@@ -48,20 +48,55 @@ class SeedService {
   static Future<void> _seedPenjualan() async {
     const List<Penjualan> penjualan = <Penjualan>[
       // 2023
-      Penjualan(noInv: 'P001', tahun: 2023, noCust: 'C001', noItm: 'I001', qty: 120, harga: 85000),
-      Penjualan(noInv: 'P002', tahun: 2023, noCust: 'C001', noItm: 'I002', qty: 90, harga: 80000),
-      Penjualan(noInv: 'P003', tahun: 2023, noCust: 'C001', noItm: 'I003', qty: 75, harga: 90000),
+      Penjualan(noInv: 'P001', tahun: 2023, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I001', qty: 120, harga: 85000),
+      ]),
+      Penjualan(noInv: 'P002', tahun: 2023, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I002', qty: 90, harga: 80000),
+      ]),
+      Penjualan(noInv: 'P003', tahun: 2023, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I003', qty: 75, harga: 90000),
+      ]),
       // 2024
-      Penjualan(noInv: 'P004', tahun: 2024, noCust: 'C001', noItm: 'I001', qty: 150, harga: 88000),
-      Penjualan(noInv: 'P005', tahun: 2024, noCust: 'C001', noItm: 'I002', qty: 110, harga: 82000),
-      Penjualan(noInv: 'P006', tahun: 2024, noCust: 'C001', noItm: 'I003', qty: 95, harga: 95000),
-      Penjualan(noInv: 'P007', tahun: 2024, noCust: 'C001', noItm: 'I004', qty: 60, harga: 90000),
+      Penjualan(noInv: 'P004', tahun: 2024, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I001', qty: 150, harga: 88000),
+      ]),
+      Penjualan(noInv: 'P005', tahun: 2024, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I002', qty: 110, harga: 82000),
+      ]),
+      Penjualan(
+        noInv: 'P006',
+        tahun: 2024,
+        noCust: 'C001',
+        items: <PenjualanLine>[
+          PenjualanLine(noItm: 'I003', qty: 95, harga: 95000),
+          PenjualanLine(noItm: 'I004', qty: 60, harga: 90000),
+        ],
+      ),
       // 2025
-      Penjualan(noInv: 'P008', tahun: 2025, noCust: 'C001', noItm: 'I001', qty: 180, harga: 90000),
-      Penjualan(noInv: 'P009', tahun: 2025, noCust: 'C001', noItm: 'I002', qty: 140, harga: 85000),
-      Penjualan(noInv: 'P010', tahun: 2025, noCust: 'C001', noItm: 'I003', qty: 120, harga: 98000),
-      Penjualan(noInv: 'P011', tahun: 2025, noCust: 'C001', noItm: 'I004', qty: 80, harga: 95000),
-      Penjualan(noInv: 'P012', tahun: 2025, noCust: 'C001', noItm: 'I005', qty: 40, harga: 250000),
+      Penjualan(noInv: 'P007', tahun: 2025, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I001', qty: 180, harga: 90000),
+      ]),
+      Penjualan(noInv: 'P008', tahun: 2025, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I002', qty: 140, harga: 85000),
+      ]),
+      Penjualan(noInv: 'P009', tahun: 2025, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I003', qty: 120, harga: 98000),
+      ]),
+      // Contoh invoice multi-item (sama seperti input manual):
+      // P010; 2025; C001; [Nastar Keong x3 @85.000, Nastar Keju x2 @90.000]
+      Penjualan(
+        noInv: 'P010',
+        tahun: 2025,
+        noCust: 'C001',
+        items: <PenjualanLine>[
+          PenjualanLine(noItm: 'I002', qty: 3, harga: 85000),
+          PenjualanLine(noItm: 'I001', qty: 2, harga: 90000),
+        ],
+      ),
+      Penjualan(noInv: 'P011', tahun: 2025, noCust: 'C001', items: <PenjualanLine>[
+        PenjualanLine(noItm: 'I005', qty: 40, harga: 250000),
+      ]),
     ];
     for (final p in penjualan) {
       await PenjualanService.save(p);
