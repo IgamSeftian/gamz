@@ -9,7 +9,7 @@ import 'chart_penjualan.dart';
 /// Widget grafik lingkaran "Chart Pie" untuk Menu Utama.
 ///
 /// Mengikuti pilihan mode (By Customer / By Item) dan nilai
-/// (Rupiah / Qty) milik Chart Penjualan.
+/// (Rupiah / Qty / Margin) milik Chart Penjualan.
 class ChartPieWidget extends StatelessWidget {
   const ChartPieWidget({
     super.key,
@@ -31,11 +31,32 @@ class ChartPieWidget extends StatelessWidget {
     Color(0xFF12B5CA),
   ];
 
-  double _valueOf(num gross, int qty) =>
-      valueMode == ChartValueMode.gross ? gross.toDouble() : qty.toDouble();
+  double _valueOf(double gross, int qty, double margin) {
+    switch (valueMode) {
+      case ChartValueMode.gross:
+      case ChartValueMode.all:
+        return gross;
+      case ChartValueMode.qty:
+        return qty.toDouble();
+      case ChartValueMode.margin:
+        return margin;
+    }
+  }
 
-  String get _nilaiLabel =>
-      valueMode == ChartValueMode.gross ? 'Omzet' : 'Qty';
+  String get _nilaiLabel {
+    switch (valueMode) {
+      case ChartValueMode.gross:
+      case ChartValueMode.all:
+        return 'Omzet';
+      case ChartValueMode.qty:
+        return 'Qty';
+      case ChartValueMode.margin:
+        return 'Margin';
+    }
+  }
+
+  /// True bila nilai ditampilkan dalam Rupiah.
+  bool get _isRupiah => valueMode != ChartValueMode.qty;
 
   List<_PieEntry> _entries() {
     final List<_PieEntry> entries = <_PieEntry>[];
@@ -45,7 +66,7 @@ class ChartPieWidget extends StatelessWidget {
         entries.add(
           _PieEntry(
             label: row.customer.nama,
-            value: _valueOf(row.gross, row.qty),
+            value: _valueOf(row.gross, row.qty, row.margin),
           ),
         );
       }
@@ -53,10 +74,11 @@ class ChartPieWidget extends StatelessWidget {
       for (final row in ReportService.perItem(tahun)) {
         entries.add(
           _PieEntry(
-            label: row.item.singkatan.isNotEmpty
-                ? row.item.singkatan
-                : row.item.nama,
-            value: _valueOf(row.gross, row.qty),
+            label:
+                row.item.singkatan.isNotEmpty
+                    ? row.item.singkatan
+                    : row.item.nama,
+            value: _valueOf(row.gross, row.qty, row.margin),
           ),
         );
       }
@@ -68,8 +90,9 @@ class ChartPieWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final List<_PieEntry> all = _entries();
     final List<_PieEntry> top = all.take(5).toList();
-    final double lainnya =
-        all.skip(5).fold<double>(0, (sum, e) => sum + e.value);
+    final double lainnya = all
+        .skip(5)
+        .fold<double>(0, (sum, e) => sum + e.value);
     final double total = all.fold<double>(0, (sum, e) => sum + e.value);
 
     final List<_PieEntry> sections = <_PieEntry>[...top];
@@ -125,8 +148,10 @@ class ChartPieWidget extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(10),
@@ -162,8 +187,7 @@ class ChartPieWidget extends StatelessWidget {
                           sections.length,
                           (i) {
                             final _PieEntry entry = sections[i];
-                            final double percent =
-                                (entry.value / total) * 100;
+                            final double percent = (entry.value / total) * 100;
                             return PieChartSectionData(
                               value: entry.value,
                               color: _palette[i % _palette.length],
@@ -198,7 +222,7 @@ class ChartPieWidget extends StatelessWidget {
               const SizedBox(height: 2),
               Center(
                 child: Text(
-                  valueMode == ChartValueMode.gross
+                  _isRupiah
                       ? formatRupiah(total)
                       : '${formatThousands(total)} pcs',
                   style: const TextStyle(
@@ -251,7 +275,7 @@ class ChartPieWidget extends StatelessWidget {
                       SizedBox(
                         width: 92,
                         child: Text(
-                          valueMode == ChartValueMode.gross
+                          _isRupiah
                               ? formatRupiah(entry.value)
                               : formatThousands(entry.value),
                           maxLines: 1,
