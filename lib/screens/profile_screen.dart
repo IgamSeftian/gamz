@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../models/toko_profile.dart';
 import '../services/backup_service.dart';
+import '../services/penjualan_service.dart';
 import '../services/toko_profile_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/form_widgets.dart';
@@ -32,11 +33,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _loading = false;
   bool _backupBusy = false;
+  bool _deleteBusy = false;
+  int? _deleteYear;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    final List<int> years = PenjualanService.years;
+    _deleteYear = years.isNotEmpty ? years.first : null;
   }
 
   void _loadProfile() {
@@ -181,8 +186,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _deleteAllPenjualan() async {
+    final List<int> years = PenjualanService.years;
+    final int? year = _deleteYear;
+    if (year == null || !years.contains(year)) {
+      _snack('Pilih tahun penjualan yang ingin dihapus.');
+      return;
+    }
+
+    final int total = PenjualanService.byYear(year).length;
+    if (total == 0) {
+      _snack('Tidak ada data penjualan pada tahun $year.');
+      return;
+    }
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Delete All Penjualan'),
+            content: Text(
+              'Hapus seluruh $total transaksi penjualan tahun $year? '
+              'Tindakan ini tidak bisa dibatalkan.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                ),
+                child: const Text('Hapus'),
+              ),
+            ],
+          ),
+    );
+    if (confirm != true) return;
+
+    setState(() => _deleteBusy = true);
+    try {
+      final int deleted = await PenjualanService.deleteByYear(year);
+      if (!mounted) return;
+      setState(() {
+        final List<int> remaining = PenjualanService.years;
+        _deleteYear = remaining.isNotEmpty ? remaining.first : null;
+      });
+      _snack('$deleted transaksi penjualan tahun $year berhasil dihapus.');
+    } catch (e) {
+      _snack('Gagal menghapus data penjualan: $e');
+    } finally {
+      if (mounted) setState(() => _deleteBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final List<int> years = PenjualanService.years;
+    final int? selectedYear = years.contains(_deleteYear) ? _deleteYear : null;
     return Scaffold(
       appBar: AppBar(title: const Text('My Profile')),
       body: ListView(
@@ -284,6 +347,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 8),
+          const Text(
+            'Delete All Penjualan',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Hapus seluruh transaksi penjualan pada tahun yang dipilih.',
+            style: TextStyle(fontSize: 12, color: AppColors.textLight),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE0E2EE)),
+            ),
+            child: DropdownButton<int>(
+              value: selectedYear,
+              isExpanded: true,
+              underline: const SizedBox.shrink(),
+              hint: const Text('Pilih tahun'),
+              icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+              style: const TextStyle(
+                color: AppColors.textDark,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+              onChanged:
+                  _deleteBusy
+                      ? null
+                      : (value) {
+                        if (value == null) return;
+                        setState(() => _deleteYear = value);
+                      },
+              items:
+                  years
+                      .map(
+                        (year) => DropdownMenuItem<int>(
+                          value: year,
+                          child: Text('$year'),
+                        ),
+                      )
+                      .toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed:
+                  (_loading || _backupBusy || _deleteBusy || years.isEmpty)
+                      ? null
+                      : _deleteAllPenjualan,
+              icon: const Icon(Icons.delete_forever_outlined),
+              label: Text(
+                _deleteBusy ? 'Menghapus...' : 'Delete All Penjualan',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.danger,
+                side: const BorderSide(color: AppColors.danger),
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -34,19 +34,18 @@ class ReportItemRow {
     required this.item,
     required this.qty,
     required this.gross,
+    required this.margin,
     required this.transaksi,
   });
 
   final Item item;
   final int qty;
   final double gross;
+  final double margin;
   final int transaksi;
 
   /// Modal baris ini: HPP x qty.
   double get modal => item.hpp * qty;
-
-  /// Margin baris ini: (harga jual - HPP) x qty.
-  double get margin => gross - modal;
 }
 
 /// Baris rekap penjualan per customer.
@@ -55,18 +54,21 @@ class ReportCustomerRow {
     required this.customer,
     required this.qty,
     required this.gross,
+    required this.margin,
     required this.transaksi,
   });
 
   final Customer customer;
   final int qty;
   final double gross;
+  final double margin;
   final int transaksi;
 }
 
 class _Acc {
   int qty = 0;
   double gross = 0;
+  double margin = 0;
   int transaksi = 0;
 }
 
@@ -82,6 +84,7 @@ class ReportService {
     final List<Penjualan> list = PenjualanService.byYear(tahun);
     double gross = 0;
     double modal = 0;
+    double margin = 0;
     int qty = 0;
     final Set<String> items = <String>{};
     final Set<String> customers = <String>{};
@@ -91,14 +94,17 @@ class ReportService {
       customers.add(p.noCust);
       for (final line in p.items) {
         items.add(line.noItm);
-        modal += (ItemService.byNo(line.noItm)?.hpp ?? 0) * line.qty;
+        final double hpp = _hppOf(line.noItm);
+        modal += hpp * line.qty;
+        // Margin = (Gross satuan - HPP) x Qty.
+        margin += (line.harga - hpp) * line.qty;
       }
     }
     return ReportSummary(
       tahun: tahun,
       totalGross: gross,
       totalModal: modal,
-      totalMargin: gross - modal,
+      totalMargin: margin,
       totalQty: qty,
       totalTransaksi: list.length,
       jumlahItem: items.length,
@@ -114,6 +120,8 @@ class ReportService {
         final acc = map.putIfAbsent(line.noItm, () => _Acc());
         acc.qty += line.qty;
         acc.gross += line.gross;
+        // Margin = (Gross satuan - HPP) x Qty.
+        acc.margin += (line.harga - _hppOf(line.noItm)) * line.qty;
         acc.transaksi += 1;
       }
     }
@@ -126,6 +134,7 @@ class ReportService {
             item: item,
             qty: e.value.qty,
             gross: e.value.gross,
+            margin: e.value.margin,
             transaksi: e.value.transaksi,
           );
         }).toList();
@@ -140,6 +149,10 @@ class ReportService {
       final acc = map.putIfAbsent(p.noCust, () => _Acc());
       acc.qty += p.qty;
       acc.gross += p.gross;
+      for (final line in p.items) {
+        // Margin = (Gross satuan - HPP) x Qty.
+        acc.margin += (line.harga - _hppOf(line.noItm)) * line.qty;
+      }
       acc.transaksi += 1;
     }
     final List<ReportCustomerRow> rows =
@@ -151,6 +164,7 @@ class ReportService {
             customer: customer,
             qty: e.value.qty,
             gross: e.value.gross,
+            margin: e.value.margin,
             transaksi: e.value.transaksi,
           );
         }).toList();
@@ -160,6 +174,8 @@ class ReportService {
 
   /// Detail seluruh transaksi pada [tahun] tertentu.
   static List<Penjualan> detail(int tahun) => PenjualanService.byYear(tahun);
+
+  static double _hppOf(String noItm) => ItemService.byNo(noItm)?.hpp ?? 0;
 
   /// Nama item dari nomor item (fallback ke nomor bila tidak ada).
   static String namaItem(String noItm) =>

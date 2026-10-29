@@ -10,8 +10,10 @@ import '../utils/currency.dart';
 /// Mode agregasi chart penjualan: per customer atau per item.
 enum ChartMode { customer, item }
 
-/// Mode nilai chart: omzet (Rupiah/gross) atau Qty terjual.
-enum ChartValueMode { gross, qty }
+const Color _chartOrange = Color(0xFFF5A623);
+
+/// Mode nilai chart: omzet (Rupiah/gross), Qty terjual, margin, atau semua.
+enum ChartValueMode { gross, qty, margin, all }
 
 /// Penampilan singkat untuk nama item/customer pada sumbu chart.
 String shortLabel(String text, {int max = 10}) {
@@ -32,8 +34,8 @@ String compactRupiah(num value) {
 
 /// Widget grafik batang "Chart Penjualan" untuk Menu Utama.
 ///
-/// Menampilkan omzet (gross) atau qty pada tahun berjalan, bisa dipilih
-/// By Customer / By Item dan nilai Rupiah / Qty. Pilihan ini juga
+/// Menampilkan omzet (gross), qty, margin, atau semua nilai sekaligus pada
+/// tahun berjalan, bisa dipilih By Customer / By Item. Pilihan mode juga
 /// dipakai oleh Chart Pie.
 class ChartPenjualanWidget extends StatelessWidget {
   const ChartPenjualanWidget({
@@ -51,8 +53,22 @@ class ChartPenjualanWidget extends StatelessWidget {
   final ChartValueMode valueMode;
   final ValueChanged<ChartValueMode> onValueChanged;
 
-  double _valueOf(num gross, int qty) =>
-      valueMode == ChartValueMode.gross ? gross.toDouble() : qty.toDouble();
+  /// Label nilai yang sedang dipilih.
+  String get _valueLabel {
+    switch (valueMode) {
+      case ChartValueMode.gross:
+        return 'Omzet';
+      case ChartValueMode.qty:
+        return 'Qty';
+      case ChartValueMode.margin:
+        return 'Margin';
+      case ChartValueMode.all:
+        return 'Omzet • Qty • Margin';
+    }
+  }
+
+  /// True bila chart menampilkan batang berganda semua nilai.
+  bool get _isGrouped => valueMode == ChartValueMode.all;
 
   List<_ChartEntry> _entries() {
     final List<_ChartEntry> entries = <_ChartEntry>[];
@@ -62,7 +78,9 @@ class ChartPenjualanWidget extends StatelessWidget {
         entries.add(
           _ChartEntry(
             label: row.customer.nama,
-            value: _valueOf(row.gross, row.qty),
+            gross: row.gross,
+            qty: row.qty,
+            margin: row.margin,
           ),
         );
       }
@@ -70,10 +88,13 @@ class ChartPenjualanWidget extends StatelessWidget {
       for (final row in ReportService.perItem(tahun)) {
         entries.add(
           _ChartEntry(
-            label: row.item.singkatan.isNotEmpty
-                ? row.item.singkatan
-                : row.item.nama,
-            value: _valueOf(row.gross, row.qty),
+            label:
+                row.item.singkatan.isNotEmpty
+                    ? row.item.singkatan
+                    : row.item.nama,
+            gross: row.gross,
+            qty: row.qty,
+            margin: row.margin,
           ),
         );
       }
@@ -81,11 +102,42 @@ class ChartPenjualanWidget extends StatelessWidget {
     return entries;
   }
 
+  /// Skala Qty agar tingginya sebanding dengan nilai Rupiah pada chart.
+  static double _qtyScale(List<_ChartEntry> entries) {
+    double moneyMax = 0;
+    int qtyMax = 0;
+    for (final entry in entries) {
+      moneyMax = math.max(moneyMax, math.max(entry.gross, entry.margin));
+      qtyMax = math.max(qtyMax, entry.qty);
+    }
+    if (moneyMax <= 0 || qtyMax <= 0) return 1;
+    return moneyMax / qtyMax;
+  }
+
+  String _seriesValue(_ChartEntry entry, int index) {
+    switch (index) {
+      case 0:
+        return formatRupiah(entry.gross);
+      case 1:
+        return '${formatThousands(entry.qty)} pcs';
+      default:
+        return formatRupiah(entry.margin);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<_ChartEntry> entries = _entries();
     final List<_ChartEntry> top = entries.take(8).toList();
-    final double maxBar = top.fold<double>(0, (max, e) => math.max(max, e.value));
+    final bool grouped = _isGrouped;
+    final double qtyScale = grouped ? _qtyScale(top) : 1;
+    final double maxBar = top.fold<double>(0, (max, entry) {
+      if (!grouped) return math.max(max, entry.valueFor(valueMode));
+      return math.max(
+        max,
+        math.max(entry.gross, math.max(entry.margin, entry.qty * qtyScale)),
+      );
+    });
 
     return Card(
       elevation: 2,
@@ -125,7 +177,7 @@ class ChartPenjualanWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${valueMode == ChartValueMode.gross ? 'Omzet' : 'Qty'} per ${mode == ChartMode.customer ? 'Customer' : 'Item'} • $tahun',
+                        '$_valueLabel per ${mode == ChartMode.customer ? 'Customer' : 'Item'} • $tahun',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textLight,
@@ -140,9 +192,15 @@ class ChartPenjualanWidget extends StatelessWidget {
             _ModeToggle(mode: mode, onChanged: onModeChanged),
             const SizedBox(height: 8),
             _ValueToggle(valueMode: valueMode, onChanged: onValueChanged),
+            if (grouped) ...<Widget>[
+              const SizedBox(height: 10),
+              const _GroupedLegend(),
+            ],
             const SizedBox(height: 18),
             if (top.isEmpty)
-              const _EmptyChart(message: 'Belum ada data penjualan pada tahun ini')
+              const _EmptyChart(
+                message: 'Belum ada data penjualan pada tahun ini',
+              )
             else
               SizedBox(
                 height: 240,
@@ -158,8 +216,19 @@ class ChartPenjualanWidget extends StatelessWidget {
                           vertical: 8,
                         ),
                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          final _ChartEntry entry = top[group.x];
+                          final String title =
+                              grouped
+                                  ? '${entry.label} • ${_seriesLabels[rodIndex]}'
+                                  : entry.label;
+                          final String value =
+                              grouped
+                                  ? _seriesValue(entry, rodIndex)
+                                  : valueMode == ChartValueMode.qty
+                                  ? '${formatThousands(rod.toY)} pcs'
+                                  : formatRupiah(rod.toY);
                           return BarTooltipItem(
-                            '${top[group.x].label}\n',
+                            '$title\n',
                             const TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
@@ -167,9 +236,7 @@ class ChartPenjualanWidget extends StatelessWidget {
                             ),
                             children: <TextSpan>[
                               TextSpan(
-                                text: valueMode == ChartValueMode.gross
-                                    ? formatRupiah(rod.toY)
-                                    : '${formatThousands(rod.toY)} pcs',
+                                text: value,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,
@@ -192,20 +259,21 @@ class ChartPenjualanWidget extends StatelessWidget {
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: 52,
-                          getTitlesWidget: (value, meta) => Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Text(
-                              valueMode == ChartValueMode.gross
-                                  ? compactRupiah(value)
-                                  : formatThousands(value),
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textLight,
-                                fontWeight: FontWeight.w500,
+                          getTitlesWidget:
+                              (value, meta) => Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: Text(
+                                  valueMode == ChartValueMode.qty
+                                      ? formatThousands(value)
+                                      : compactRupiah(value),
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textLight,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
                         ),
                       ),
                       bottomTitles: AxisTitles(
@@ -241,34 +309,49 @@ class ChartPenjualanWidget extends StatelessWidget {
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: false,
-                      horizontalInterval: maxBar <= 0 ? 1 : _niceInterval(maxBar),
-                      getDrawingHorizontalLine: (_) => const FlLine(
-                        color: Color(0xFFEDEFF7),
-                        strokeWidth: 1,
-                      ),
+                      horizontalInterval:
+                          maxBar <= 0 ? 1 : _niceInterval(maxBar),
+                      getDrawingHorizontalLine:
+                          (_) => const FlLine(
+                            color: Color(0xFFEDEFF7),
+                            strokeWidth: 1,
+                          ),
                     ),
                     borderData: FlBorderData(show: false),
-                    barGroups: List<BarChartGroupData>.generate(
-                      top.length,
-                      (i) => BarChartGroupData(
-                        x: i,
-                        barRods: <BarChartRodData>[
-                          BarChartRodData(
-                            toY: top[i].value,
-                            width: 22,
-                            borderRadius: BorderRadius.circular(7),
-                            gradient: const LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: <Color>[
-                                AppColors.primary,
-                                AppColors.accent,
-                              ],
+                    barGroups: List<BarChartGroupData>.generate(top.length, (
+                      i,
+                    ) {
+                      final _ChartEntry entry = top[i];
+                      if (!grouped) {
+                        return BarChartGroupData(
+                          x: i,
+                          barRods: <BarChartRodData>[
+                            BarChartRodData(
+                              toY: entry.valueFor(valueMode),
+                              width: 22,
+                              borderRadius: BorderRadius.circular(7),
+                              gradient: const LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: <Color>[
+                                  AppColors.primary,
+                                  AppColors.accent,
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
+                        );
+                      }
+                      return BarChartGroupData(
+                        x: i,
+                        barsSpace: 2,
+                        barRods: <BarChartRodData>[
+                          _groupedRod(entry.gross, AppColors.primary),
+                          _groupedRod(entry.qty * qtyScale, _chartOrange),
+                          _groupedRod(entry.margin, AppColors.success),
                         ],
-                      ),
-                    ),
+                      );
+                    }),
                   ),
                   duration: const Duration(milliseconds: 450),
                   curve: Curves.easeOutCubic,
@@ -280,11 +363,20 @@ class ChartPenjualanWidget extends StatelessWidget {
     );
   }
 
+  static BarChartRodData _groupedRod(double toY, Color color) {
+    return BarChartRodData(
+      toY: toY,
+      width: 6,
+      borderRadius: BorderRadius.circular(3),
+      color: color,
+    );
+  }
+
   /// Interval grid horizontal yang "bulat" agar sumbu Y enak dibaca.
   static double _niceInterval(double max) {
     final double raw = max / 4;
-    final double magnitude = math.pow(10, (math.log(raw) / math.ln10).floor())
-        .toDouble();
+    final double magnitude =
+        math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
     final double normalized = raw / magnitude;
     double step;
     if (normalized <= 1) {
@@ -300,11 +392,82 @@ class ChartPenjualanWidget extends StatelessWidget {
   }
 }
 
+const List<String> _seriesLabels = <String>['Omzet', 'Qty', 'Margin'];
+
 class _ChartEntry {
-  const _ChartEntry({required this.label, required this.value});
+  const _ChartEntry({
+    required this.label,
+    required this.gross,
+    required this.qty,
+    required this.margin,
+  });
 
   final String label;
-  final double value;
+  final double gross;
+  final int qty;
+  final double margin;
+
+  double valueFor(ChartValueMode mode) {
+    switch (mode) {
+      case ChartValueMode.gross:
+      case ChartValueMode.all:
+        return gross;
+      case ChartValueMode.qty:
+        return qty.toDouble();
+      case ChartValueMode.margin:
+        return margin;
+    }
+  }
+}
+
+class _GroupedLegend extends StatelessWidget {
+  const _GroupedLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 16,
+      runSpacing: 6,
+      children: const <Widget>[
+        _LegendItem(label: 'Omzet', color: AppColors.primary),
+        _LegendItem(label: 'Qty', color: _chartOrange),
+        _LegendItem(label: 'Margin', color: AppColors.success),
+      ],
+    );
+  }
+}
+
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textLight,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Toggle pill By Customer / By Item, mengikuti gaya _DetailToggle.
@@ -373,15 +536,16 @@ class _ModeButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
-            boxShadow: selected
-                ? <BoxShadow>[
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.12),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
+            boxShadow:
+                selected
+                    ? <BoxShadow>[
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                    : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -392,12 +556,18 @@ class _ModeButton extends StatelessWidget {
                 color: selected ? AppColors.primary : AppColors.textLight,
               ),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? AppColors.primary : AppColors.textLight,
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? AppColors.primary : AppColors.textLight,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -408,7 +578,7 @@ class _ModeButton extends StatelessWidget {
   }
 }
 
-/// Toggle pill Rupiah (Gross) / Qty, dipakai di Chart Penjualan.
+/// Toggle pill OmSet / Qty / Margin / All, dipakai di Chart Penjualan.
 class _ValueToggle extends StatelessWidget {
   const _ValueToggle({required this.valueMode, required this.onChanged});
 
@@ -427,7 +597,7 @@ class _ValueToggle extends StatelessWidget {
         children: <Widget>[
           Expanded(
             child: _ModeButton(
-              label: 'Rupiah (Gross)',
+              label: 'OmSet',
               icon: Icons.payments_outlined,
               selected: valueMode == ChartValueMode.gross,
               onTap: () => onChanged(ChartValueMode.gross),
@@ -439,6 +609,22 @@ class _ValueToggle extends StatelessWidget {
               icon: Icons.inventory_2_outlined,
               selected: valueMode == ChartValueMode.qty,
               onTap: () => onChanged(ChartValueMode.qty),
+            ),
+          ),
+          Expanded(
+            child: _ModeButton(
+              label: 'Margin',
+              icon: Icons.trending_up_outlined,
+              selected: valueMode == ChartValueMode.margin,
+              onTap: () => onChanged(ChartValueMode.margin),
+            ),
+          ),
+          Expanded(
+            child: _ModeButton(
+              label: 'All',
+              icon: Icons.bar_chart_rounded,
+              selected: valueMode == ChartValueMode.all,
+              onTap: () => onChanged(ChartValueMode.all),
             ),
           ),
         ],

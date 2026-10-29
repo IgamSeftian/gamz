@@ -562,6 +562,7 @@ class _MarginTab extends StatelessWidget {
                 value: formatRupiah(row.margin),
                 details: <String>[
                   'Qty: ${formatThousands(row.qty)}',
+                  'Gross: ${formatRupiah(row.gross)}',
                   'HPP: ${formatRupiah(row.item.hpp)}',
                   'Modal: ${formatRupiah(row.modal)}',
                 ],

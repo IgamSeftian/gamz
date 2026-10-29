@@ -57,7 +57,9 @@ class PenjualanService {
   static String nextNumber() {
     int max = 0;
     for (final key in _box.keys) {
-      final num = int.tryParse(key.toString().replaceAll(RegExp(r'[^0-9]'), ''));
+      final num = int.tryParse(
+        key.toString().replaceAll(RegExp(r'[^0-9]'), ''),
+      );
       if (num != null && num > max) max = num;
     }
     return 'P${(max + 1).toString().padLeft(3, '0')}';
@@ -77,5 +79,18 @@ class PenjualanService {
 
   static Future<void> delete(String noInv) async {
     await _box.delete(noInv);
+  }
+
+  /// Menghapus seluruh transaksi pada [tahun]. Mengembalikan jumlah terhapus.
+  static Future<int> deleteByYear(int tahun) async {
+    final List<String> keys = <String>[];
+    for (final key in _box.keys) {
+      final data = _box.get(key);
+      if (data is Map && (data['tahun'] as num?)?.toInt() == tahun) {
+        keys.add(key.toString());
+      }
+    }
+    await _box.deleteAll(keys);
+    return keys.length;
   }
 }
