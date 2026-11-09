@@ -185,7 +185,7 @@ Future<Uint8List> buildReportPdf(
                     <String>[
                       '${i + 1}',
                       perItem[i].item.nama,
-                      formatRupiah(perItem[i].item.hpp),
+                      formatRupiah(perItem[i].hpp),
                       formatThousands(perItem[i].qty),
                       formatRupiah(perItem[i].modal),
                     ],
@@ -217,8 +217,8 @@ Future<Uint8List> buildReportPdf(
                     <String>[
                       '${i + 1}',
                       perItem[i].item.nama,
-                      formatRupiah(perItem[i].item.harga),
-                      formatRupiah(perItem[i].item.hpp),
+                      formatRupiah(perItem[i].harga),
+                      formatRupiah(perItem[i].hpp),
                       formatThousands(perItem[i].qty),
                       formatRupiah(perItem[i].margin),
                     ],

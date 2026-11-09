@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
-
 import 'screens/splash_screen.dart';
 import 'services/database_service.dart';
+import 'services/penjualan_service.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DatabaseService.init();
+  await PenjualanService.migrateSnapshots();
   await SeedService.seedIfEmpty();
   runApp(const GamzApp());
 }

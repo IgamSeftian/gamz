@@ -16,9 +16,11 @@ class ChartPieWidget extends StatelessWidget {
     required this.tahun,
     required this.mode,
     required this.valueMode,
+    this.event,
   });
 
   final int tahun;
+  final String? event;
   final ChartMode mode;
   final ChartValueMode valueMode;
 
@@ -62,7 +64,7 @@ class ChartPieWidget extends StatelessWidget {
     final List<_PieEntry> entries = <_PieEntry>[];
 
     if (mode == ChartMode.customer) {
-      for (final row in ReportService.perCustomer(tahun)) {
+      for (final row in ReportService.perCustomer(tahun, event: event)) {
         entries.add(
           _PieEntry(
             label: row.customer.nama,
@@ -71,7 +73,7 @@ class ChartPieWidget extends StatelessWidget {
         );
       }
     } else {
-      for (final row in ReportService.perItem(tahun)) {
+      for (final row in ReportService.perItem(tahun, event: event)) {
         entries.add(
           _PieEntry(
             label:
@@ -138,7 +140,8 @@ class ChartPieWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Proporsi $_nilaiLabel per ${mode == ChartMode.customer ? 'Customer' : 'Item'} • $tahun',
+                        'Proporsi $_nilaiLabel per ${mode == ChartMode.customer ? 'Customer' : 'Item'} • '
+                        '${event == null || event!.isEmpty ? 'Semua Event' : event} • $tahun',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textLight,

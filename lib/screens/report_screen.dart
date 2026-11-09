@@ -519,7 +519,7 @@ class _ModalTab extends StatelessWidget {
                 value: formatRupiah(row.modal),
                 details: <String>[
                   'Qty: ${formatThousands(row.qty)}',
-                  'HPP: ${formatRupiah(row.item.hpp)}',
+                  'HPP: ${formatRupiah(row.hpp)}',
                 ],
               ),
             ),
@@ -563,7 +563,7 @@ class _MarginTab extends StatelessWidget {
                 details: <String>[
                   'Qty: ${formatThousands(row.qty)}',
                   'Gross: ${formatRupiah(row.gross)}',
-                  'HPP: ${formatRupiah(row.item.hpp)}',
+                  'HPP: ${formatRupiah(row.hpp)}',
                   'Modal: ${formatRupiah(row.modal)}',
                 ],
               ),

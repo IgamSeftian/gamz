@@ -11,6 +11,7 @@ import '../widgets/chart_penjualan.dart';
 import '../widgets/chart_pie.dart';
 import 'login_screen.dart';
 import 'master_customer_screen.dart';
+import 'master_event_screen.dart';
 import 'master_item_screen.dart';
 import 'master_penjualan_screen.dart';
 import 'profile_screen.dart';
@@ -26,6 +27,9 @@ class MainMenuScreen extends StatefulWidget {
 class _MainMenuScreenState extends State<MainMenuScreen> {
   late int _selectedYear;
   late List<Penjualan> _penjualan;
+
+  /// Event terpilih; null berarti semua event.
+  String? _selectedEvent;
 
   /// True = detail ditampilkan, False = detail disembunyikan.
   bool _showDetail = false;
@@ -50,23 +54,41 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     if (!years.contains(_selectedYear)) {
       _selectedYear = years.isNotEmpty ? years.first : DateTime.now().year;
     }
-    _penjualan = PenjualanService.byYear(_selectedYear);
+    final events = PenjualanService.eventNames;
+    if (_selectedEvent != null && !events.contains(_selectedEvent)) {
+      _selectedEvent = null;
+    }
+    _penjualan = PenjualanService.byYearAndEvent(
+      _selectedYear,
+      event: _selectedEvent,
+    );
   }
 
   void _onYearChanged(int? year) {
     if (year == null) return;
     setState(() {
       _selectedYear = year;
-      _penjualan = PenjualanService.byYear(year);
+      _penjualan = PenjualanService.byYearAndEvent(year, event: _selectedEvent);
+      _showDetail = false;
+    });
+  }
+
+  void _onEventChanged(String? event) {
+    setState(() {
+      _selectedEvent = event;
+      _penjualan = PenjualanService.byYearAndEvent(
+        _selectedYear,
+        event: _selectedEvent,
+      );
       _showDetail = false;
     });
   }
 
   /// Membuka halaman master lalu menyegarkan data menu utama saat kembali.
   Future<void> _openMaster(Widget screen) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => screen),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => screen));
     if (!mounted) return;
     setState(_reload);
   }
@@ -74,20 +96,21 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Yakin ingin keluar dari akun ini?'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Logout'),
+            content: const Text('Yakin ingin keluar dari akun ini?'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Logout'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
     );
 
     if (confirm != true) return;
@@ -103,8 +126,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
   Widget build(BuildContext context) {
     final years = PenjualanService.years;
-    final double grandTotal = PenjualanService.totalForYear(_selectedYear);
+    final events = PenjualanService.eventNames;
+    final double grandTotal = _penjualan.fold<double>(
+      0,
+      (sum, p) => sum + p.gross,
+    );
     final int totalQty = _penjualan.fold<int>(0, (sum, p) => sum + p.qty);
+    final double totalHpp = _penjualan.fold<double>(0, (sum, p) => sum + p.hpp);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Menu Utama')),
@@ -114,15 +142,21 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            _buildHeader(years, grandTotal, totalQty),
+            _buildHeader(years, events, grandTotal, totalQty, totalHpp),
             ChartPenjualanWidget(
               tahun: _selectedYear,
+              event: _selectedEvent,
               mode: _chartMode,
               onModeChanged: (mode) => setState(() => _chartMode = mode),
               valueMode: _chartValueMode,
               onValueChanged: (mode) => setState(() => _chartValueMode = mode),
             ),
-            ChartPieWidget(tahun: _selectedYear, mode: _chartMode, valueMode: _chartValueMode),
+            ChartPieWidget(
+              tahun: _selectedYear,
+              event: _selectedEvent,
+              mode: _chartMode,
+              valueMode: _chartValueMode,
+            ),
           ],
         ),
       ),
@@ -188,6 +222,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.event_outlined),
+            title: const Text(' List Event '),
+            onTap: () {
+              Navigator.pop(context);
+              _openMaster(const MasterEventScreen());
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.receipt_long_outlined),
             title: const Text(' List Penjualan '),
             onTap: () {
@@ -225,7 +267,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  Widget _buildHeader(List<int> years, double grandTotal, int totalQty) {
+  Widget _buildHeader(
+    List<int> years,
+    List<String> events,
+    double grandTotal,
+    int totalQty,
+    double totalHpp,
+  ) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -264,6 +312,27 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              const Icon(Icons.event_outlined, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Event',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              _EventDropdown(
+                events: events,
+                value: _selectedEvent,
+                onChanged: _onEventChanged,
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           Row(
             children: <Widget>[
@@ -283,6 +352,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          _SummaryTile(
+            label: 'Total HPP',
+            value: formatRupiah(totalHpp),
+            icon: Icons.account_balance_wallet_outlined,
           ),
           const SizedBox(height: 16),
           _DetailToggle(
@@ -305,16 +380,16 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate:
-                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 360,
                   mainAxisExtent: 220,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
                 ),
                 itemCount: _penjualan.length,
-                itemBuilder: (context, index) =>
-                    _PenjualanCard(penjualan: _penjualan[index]),
+                itemBuilder:
+                    (context, index) =>
+                        _PenjualanCard(penjualan: _penjualan[index]),
               ),
           ],
         ],
@@ -353,24 +428,63 @@ class _YearDropdown extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
         onChanged: onChanged,
-        items: years
-            .map(
-              (year) => DropdownMenuItem<int>(
-                value: year,
-                child: Text('$year'),
-              ),
-            )
-            .toList(),
+        items:
+            years
+                .map(
+                  (year) =>
+                      DropdownMenuItem<int>(value: year, child: Text('$year')),
+                )
+                .toList(),
+      ),
+    );
+  }
+}
+
+class _EventDropdown extends StatelessWidget {
+  const _EventDropdown({
+    required this.events,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final List<String> events;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: DropdownButton<String>(
+        value: value != null && events.contains(value) ? value : '',
+        underline: const SizedBox.shrink(),
+        isDense: true,
+        icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+        style: const TextStyle(
+          color: AppColors.textDark,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+        onChanged:
+            (selected) => onChanged(
+              selected == null || selected.isEmpty ? null : selected,
+            ),
+        items: <DropdownMenuItem<String>>[
+          const DropdownMenuItem<String>(value: '', child: Text('Semua Event')),
+          for (final event in events)
+            DropdownMenuItem<String>(value: event, child: Text(event)),
+        ],
       ),
     );
   }
 }
 
 class _DetailToggle extends StatelessWidget {
-  const _DetailToggle({
-    required this.showDetail,
-    required this.onTap,
-  });
+  const _DetailToggle({required this.showDetail, required this.onTap});
 
   final bool showDetail;
   final VoidCallback onTap;

@@ -45,9 +45,11 @@ class ChartPenjualanWidget extends StatelessWidget {
     required this.onModeChanged,
     required this.valueMode,
     required this.onValueChanged,
+    this.event,
   });
 
   final int tahun;
+  final String? event;
   final ChartMode mode;
   final ValueChanged<ChartMode> onModeChanged;
   final ChartValueMode valueMode;
@@ -74,7 +76,7 @@ class ChartPenjualanWidget extends StatelessWidget {
     final List<_ChartEntry> entries = <_ChartEntry>[];
 
     if (mode == ChartMode.customer) {
-      for (final row in ReportService.perCustomer(tahun)) {
+      for (final row in ReportService.perCustomer(tahun, event: event)) {
         entries.add(
           _ChartEntry(
             label: row.customer.nama,
@@ -85,7 +87,7 @@ class ChartPenjualanWidget extends StatelessWidget {
         );
       }
     } else {
-      for (final row in ReportService.perItem(tahun)) {
+      for (final row in ReportService.perItem(tahun, event: event)) {
         entries.add(
           _ChartEntry(
             label:
@@ -177,7 +179,8 @@ class ChartPenjualanWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$_valueLabel per ${mode == ChartMode.customer ? 'Customer' : 'Item'} • $tahun',
+                        '$_valueLabel per ${mode == ChartMode.customer ? 'Customer' : 'Item'} • '
+                        '${event == null || event!.isEmpty ? 'Semua Event' : event} • $tahun',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textLight,

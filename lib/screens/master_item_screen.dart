@@ -231,6 +231,14 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     ThousandsInputFormatter(),
                   ],
                   textInputAction: TextInputAction.done,
+                  validator: (value) {
+                    final harga = parseThousands(_harga.text) ?? 0;
+                    final hpp = parseThousands(value ?? '') ?? 0;
+                    if (hpp > harga) {
+                      return 'HPP tidak boleh lebih besar dari Harga';
+                    }
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(height: 28),

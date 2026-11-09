@@ -8,6 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 /// - [itemsBoxName]     : menyimpan master item (kue)
 /// - [customersBoxName] : menyimpan master customer
 /// - [penjualanBoxName] : menyimpan transaksi penjualan (master penjualan)
+/// - [eventsBoxName]    : menyimpan master event (periode PO)
 ///
 /// Hive dipilih karena berjalan di semua platform (Android, iOS, Windows,
 /// macOS, Linux, dan Web) tanpa konfigurasi tambahan.
@@ -19,6 +20,7 @@ class DatabaseService {
   static const String itemsBoxName = 'items';
   static const String customersBoxName = 'customers';
   static const String penjualanBoxName = 'penjualan';
+  static const String eventsBoxName = 'events';
   static const String tokoProfileBoxName = 'toko_profile';
 
   /// Dipanggil sekali saat aplikasi start.
@@ -29,6 +31,7 @@ class DatabaseService {
     await Hive.openBox(itemsBoxName);
     await Hive.openBox(customersBoxName);
     await Hive.openBox(penjualanBoxName);
+    await Hive.openBox(eventsBoxName);
     await Hive.openBox(tokoProfileBoxName);
   }
 
@@ -46,6 +49,9 @@ class DatabaseService {
 
   /// Box berisi transaksi penjualan (master penjualan).
   static Box get penjualan => Hive.box(penjualanBoxName);
+
+  /// Box berisi master event (periode PO).
+  static Box get events => Hive.box(eventsBoxName);
 
   /// Box berisi profil toko.
   static Box get tokoProfile => Hive.box(tokoProfileBoxName);

@@ -34,6 +34,7 @@ class ReportItemRow {
     required this.item,
     required this.qty,
     required this.gross,
+    required this.modal,
     required this.margin,
     required this.transaksi,
   });
@@ -41,11 +42,17 @@ class ReportItemRow {
   final Item item;
   final int qty;
   final double gross;
+
+  /// Modal baris ini: Σ (HPP snapshot × qty).
+  final double modal;
   final double margin;
   final int transaksi;
 
-  /// Modal baris ini: HPP x qty.
-  double get modal => item.hpp * qty;
+  /// HPP rata-rata snapshot per unit.
+  double get hpp => qty == 0 ? 0 : modal / qty;
+
+  /// Harga jual rata-rata snapshot per unit.
+  double get harga => qty == 0 ? 0 : gross / qty;
 }
 
 /// Baris rekap penjualan per customer.
@@ -68,6 +75,7 @@ class ReportCustomerRow {
 class _Acc {
   int qty = 0;
   double gross = 0;
+  double modal = 0;
   double margin = 0;
   int transaksi = 0;
 }
@@ -79,9 +87,24 @@ class ReportService {
   /// Semua tahun yang tersedia (dari master penjualan).
   static List<int> get years => PenjualanService.years;
 
+  /// Nama event yang tersedia (Distinct Penjualan.Event).
+  static List<String> get eventNames => PenjualanService.eventNames;
+
+  static List<Penjualan> _list(int tahun, String? event) =>
+      PenjualanService.byYearAndEvent(tahun, event: event);
+
+  /// Total HPP (modal) untuk [tahun]: Σ (qty terjual × HPP item).
+  static double totalHpp(int tahun, {String? event}) {
+    double total = 0;
+    for (final p in _list(tahun, event)) {
+      total += p.hpp;
+    }
+    return total;
+  }
+
   /// Ringkasan untuk [tahun] tertentu.
-  static ReportSummary summary(int tahun) {
-    final List<Penjualan> list = PenjualanService.byYear(tahun);
+  static ReportSummary summary(int tahun, {String? event}) {
+    final List<Penjualan> list = _list(tahun, event);
     double gross = 0;
     double modal = 0;
     double margin = 0;
@@ -94,10 +117,9 @@ class ReportService {
       customers.add(p.noCust);
       for (final line in p.items) {
         items.add(line.noItm);
-        final double hpp = _hppOf(line.noItm);
-        modal += hpp * line.qty;
+        modal += line.modal;
         // Margin = (Gross satuan - HPP) x Qty.
-        margin += (line.harga - hpp) * line.qty;
+        margin += (line.harga - line.hpp) * line.qty;
       }
     }
     return ReportSummary(
@@ -113,15 +135,16 @@ class ReportService {
   }
 
   /// Rekap per item, diurutkan dari omzet terbesar.
-  static List<ReportItemRow> perItem(int tahun) {
+  static List<ReportItemRow> perItem(int tahun, {String? event}) {
     final Map<String, _Acc> map = <String, _Acc>{};
-    for (final p in PenjualanService.byYear(tahun)) {
+    for (final p in _list(tahun, event)) {
       for (final line in p.items) {
         final acc = map.putIfAbsent(line.noItm, () => _Acc());
         acc.qty += line.qty;
         acc.gross += line.gross;
+        acc.modal += line.modal;
         // Margin = (Gross satuan - HPP) x Qty.
-        acc.margin += (line.harga - _hppOf(line.noItm)) * line.qty;
+        acc.margin += (line.harga - line.hpp) * line.qty;
         acc.transaksi += 1;
       }
     }
@@ -134,6 +157,7 @@ class ReportService {
             item: item,
             qty: e.value.qty,
             gross: e.value.gross,
+            modal: e.value.modal,
             margin: e.value.margin,
             transaksi: e.value.transaksi,
           );
@@ -143,15 +167,15 @@ class ReportService {
   }
 
   /// Rekap per customer, diurutkan dari omzet terbesar.
-  static List<ReportCustomerRow> perCustomer(int tahun) {
+  static List<ReportCustomerRow> perCustomer(int tahun, {String? event}) {
     final Map<String, _Acc> map = <String, _Acc>{};
-    for (final p in PenjualanService.byYear(tahun)) {
+    for (final p in _list(tahun, event)) {
       final acc = map.putIfAbsent(p.noCust, () => _Acc());
       acc.qty += p.qty;
       acc.gross += p.gross;
       for (final line in p.items) {
         // Margin = (Gross satuan - HPP) x Qty.
-        acc.margin += (line.harga - _hppOf(line.noItm)) * line.qty;
+        acc.margin += (line.harga - line.hpp) * line.qty;
       }
       acc.transaksi += 1;
     }
@@ -173,9 +197,8 @@ class ReportService {
   }
 
   /// Detail seluruh transaksi pada [tahun] tertentu.
-  static List<Penjualan> detail(int tahun) => PenjualanService.byYear(tahun);
-
-  static double _hppOf(String noItm) => ItemService.byNo(noItm)?.hpp ?? 0;
+  static List<Penjualan> detail(int tahun, {String? event}) =>
+      _list(tahun, event);
 
   /// Nama item dari nomor item (fallback ke nomor bila tidak ada).
   static String namaItem(String noItm) =>

@@ -18,6 +18,7 @@ class BackupService {
     DatabaseService.itemsBoxName,
     DatabaseService.customersBoxName,
     DatabaseService.penjualanBoxName,
+    DatabaseService.eventsBoxName,
     DatabaseService.tokoProfileBoxName,
   ];
 
